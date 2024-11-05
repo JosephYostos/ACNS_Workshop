@@ -542,3 +542,19 @@ kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].me
 
 ## FQDN policy 
 
+Now the application Owner contacted you asking why his pets shop application is not able to contact Microsoft Graph API.
+
+let's try 
+
+```bash
+kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].metadata.name}')  -- sh -c 'wget https://graph.microsoft.com'
+```
+
+This is an expected behaviour because we have implemented zero trust security policy and denying any traffic and just enabling the required ones.
+
+To allow the access to Microsoft Graph API we will create fqdn Network policy 
+Note: FQDN filtering requires ACNS to be enabled 
+
+```bash
+```
+
