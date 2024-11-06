@@ -143,19 +143,7 @@ hubble config set tls true
 hubble config set tls-server-name instance.hubble-relay.cilium.io
 ```
 
-## Install hubble UI
 
-Apply the hubble-ui.yaml manifest to your cluster, using the following command
-
-```bash
-kubectl apply -f https://raw.githubusercontent.com/JosephYostos/ACNS_Workshop/refs/heads/main/assets/hubble_UI.yaml
-```
-
-Set up port forwarding for Hubble UI using the kubectl port-forward command.
-```bash
-kubectl -n kube-system port-forward svc/hubble-ui 12000:80
-```
-Access Hubble UI by entering http://localhost:12000/ into your web browser.
 
 ## Setting Up the Demo Application
 
@@ -239,7 +227,7 @@ kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].me
 At the same time, we should be able to access the pet shop app UI and order product norrmally. 
 
 
-##  Configuring FQDN (Fully Qualified Domain Name) filtering
+##  Configuring FQDN Filtering using ACNS
 
 In this section, we’ll apply FQDN-based network policies to control outbound access to specific domains. This ACNS feature is only enabled for clusters using Azure CNI Powered by Cilium.
 
@@ -267,7 +255,13 @@ Now if we try to acccess Microsoft Graph API from order-service app, that should
 kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].metadata.name}')  -- sh -c 'wget https://graph.microsoft.com'
 ```
 
-## Network Metrics with Grafana 
+##  Monitoring Advanced Network Metrics and Flows
+
+With Grafana provided by ACNS, you can visualize real-time data and gain insights into network traffic patterns, performance, and policy effectiveness.
+
+Goal: Customer reported a problem in accessing the pets shop. We need to fix this issue
+
+1. **Introducing Chaos to Test container networking**
 
 let's start with applying the chaos policy to generate some drop traffic 
 
@@ -275,8 +269,9 @@ let's start with applying the chaos policy to generate some drop traffic
 kubectl apply -f assets/chaos_policy.yaml
 ```
 
-In the previous section we were able to enable traffic to a specific fqdn but it looks that something wrong happened, customers are not able to access the pet shop anymore 
+2. **Access Grafana Dashboard**
 
+ACNS metrics provide insights into traffic volume, dropped packets, number of connections, etc. The metrics are stored in Prometheus format and, as such, you can view them in Grafana.
 Let's use grafana dashboard to see what's wrong
 
 From your browser, navigate to [Azure Portal](https://aka.ms/publicportal), search for _acns-grafana_ resource, then click on the _endpoint_ link
@@ -301,8 +296,8 @@ Now you can see increase in the dropped incomming traffic and the reason is "pol
 |-------------------------------|-------------------------------|
 
 
-## observe network flows woth hubble 
-=====> what is hubble as part of ACNS 
+3. **observe network flows with hubble** 
+ACNS integrates with Hubble to provide flow logs and deep visibility into your cluster's network activity. All communications to and from pods are logged allowing you to investigate connectivity issues over time.
 
 We aready have hubble installed in the cluster. check Hubble pods are running using the `kubectl get pods` command. 
 
@@ -350,5 +345,22 @@ And finally our pets applications back to live
 
 ![Alt Text](assets/ACNS-Pets_App.png)
 
+## [Optional] configure Hubble UI to visualize traffic 
+
+1. **Install hubble UI**
+
+Apply the hubble-ui.yaml manifest to your cluster, using the following command
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/JosephYostos/ACNS_Workshop/refs/heads/main/assets/hubble_UI.yaml
+```
+
+2. **Forward Hubble Relay Traffic**
+Set up port forwarding for Hubble UI using the kubectl port-forward command.
+```bash
+kubectl -n kube-system port-forward svc/hubble-ui 12000:80
+```
+3. **Aceess Hubble UI**
+Access Hubble UI by entering http://localhost:12000/ into your web browser.
 
 
