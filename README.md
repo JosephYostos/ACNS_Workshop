@@ -254,7 +254,7 @@ Lets' change the view to the  _Kubernetes / Networking / Drops_, select the _def
 
 ![Alt Text](assets/ACNS-dropps_incoming_traffic.png)
 
-Now you can see increase in the dropped incomming traffic and the reason is "policy_denied" so now we now the reason that something was wrong with the network policy. let's dive dipper and see dropped network flows using Hubble
+Now you can see increase in the dropped incomming traffic and the reason is "policy_denied" so now we now the reason that something was wrong with the network policy. let's dive dipper and understand why this is happening
 
 [Optional] Famliarize yourself with the other dashobards for DNS, and pod flows
 
@@ -265,7 +265,7 @@ Now you can see increase in the dropped incomming traffic and the reason is "pol
 ## observe network flows woth hubble 
 =====> what is hubble as part of ACNS 
 
-We aready have hubble installed in the cluster. check Hubble pods are running using the kubectl get pods command. 
+We aready have hubble installed in the cluster. check Hubble pods are running using the `kubectl get pods` command. 
 
 ```bash
 kubectl get pods -o wide -n kube-system -l k8s-app=hubble-relay
@@ -273,19 +273,43 @@ kubectl get pods -o wide -n kube-system -l k8s-app=hubble-relay
 
 Your output should look similar to the following example output:
 
+`hubble-relay-7ddd887cdb-h6khj     1/1  Running     0       23h` 
 
-hubble-relay-7ddd887cdb-h6khj     1/1  Running     0       23h 
+First we need to port forward the hubble relay traffic
+
+```bash
+kubectl port-forward -n kube-system svc/hubble-relay --address 127.0.0.1 4245:443
+```
+
+Using hubble we will look for what is dropped 
+
+```bash
+hubble observe --verdict DROPPED
+```
+
+Here we can see traffic comming from world dropped in frontstore 
+
+![Alt Text](assets/ACNS-hubble_cli.png)
 
 
+So now we can tell that there is a problem with the frontend ingress traffic configureation, lets review the `allow-store-front-traffic` policy 
 
+```bash
+kubectl describe cnp allow-store-front-traffic
+```
 
+here we go, we see that the Ingress gtraffic is not allowed 
+![Alt Text](assets/ACNS-policy_output.png)
 
+Now to solve the problem we will apply the original 
 
+```bash
+kubectl apply -f assets/allow-store-front-traffic.yaml
+```
 
+And finally our pets applications back to live 
 
-
-
-
+![Alt Text](assets/ACNS-Pets_App.png)
 
 
 
