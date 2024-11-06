@@ -139,249 +139,10 @@ hubble config set tls-server-name instance.hubble-relay.cilium.io
 
 ## Install hubble UI
 
-To use Hubble UI, save the following into hubble-ui.yaml
-
-```bash
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: hubble-ui
-  namespace: kube-system
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: hubble-ui
-  labels:
-    app.kubernetes.io/part-of: retina
-rules:
-  - apiGroups:
-      - networking.k8s.io
-    resources:
-      - networkpolicies
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - componentstatuses
-      - endpoints
-      - namespaces
-      - nodes
-      - pods
-      - services
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - apiextensions.k8s.io
-    resources:
-      - customresourcedefinitions
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - cilium.io
-    resources:
-      - "*"
-    verbs:
-      - get
-      - list
-      - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: hubble-ui
-  labels:
-    app.kubernetes.io/part-of: retina
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: hubble-ui
-subjects:
-  - kind: ServiceAccount
-    name: hubble-ui
-    namespace: kube-system
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: hubble-ui-nginx
-  namespace: kube-system
-data:
-  nginx.conf: |
-    server {
-        listen       8081;
-        server_name  localhost;
-        root /app;
-        index index.html;
-        client_max_body_size 1G;
-        location / {
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            # CORS
-            add_header Access-Control-Allow-Methods "GET, POST, PUT, HEAD, DELETE, OPTIONS";
-            add_header Access-Control-Allow-Origin *;
-            add_header Access-Control-Max-Age 1728000;
-            add_header Access-Control-Expose-Headers content-length,grpc-status,grpc-message;
-            add_header Access-Control-Allow-Headers range,keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,x-accept-content-transfer-encoding,x-accept-response-streaming,x-user-agent,x-grpc-web,grpc-timeout;
-            if ($request_method = OPTIONS) {
-                return 204;
-            }
-            # /CORS
-            location /api {
-                proxy_http_version 1.1;
-                proxy_pass_request_headers on;
-                proxy_hide_header Access-Control-Allow-Origin;
-                proxy_pass http://127.0.0.1:8090;
-            }
-            location / {
-                try_files $uri $uri/ /index.html /index.html;
-            }
-            # Liveness probe
-            location /healthz {
-                access_log off;
-                add_header Content-Type text/plain;
-                return 200 'ok';
-            }
-        }
-    }
----
-kind: Deployment
-apiVersion: apps/v1
-metadata:
-  name: hubble-ui
-  namespace: kube-system
-  labels:
-    k8s-app: hubble-ui
-    app.kubernetes.io/name: hubble-ui
-    app.kubernetes.io/part-of: retina
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      k8s-app: hubble-ui
-  template:
-    metadata:
-      labels:
-        k8s-app: hubble-ui
-        app.kubernetes.io/name: hubble-ui
-        app.kubernetes.io/part-of: retina
-    spec:
-      serviceAccount: hibble-ui
-      serviceAccountName: hubble-ui
-      automountServiceAccountToken: true
-      containers:
-      - name: frontend
-        image: mcr.microsoft.com/oss/cilium/hubble-ui:v0.12.2   
-        imagePullPolicy: Always
-        ports:
-        - name: http
-          containerPort: 8081
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8081
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 8081
-        resources: {}
-        volumeMounts:
-        - name: hubble-ui-nginx-conf
-          mountPath: /etc/nginx/conf.d/default.conf
-          subPath: nginx.conf
-        - name: tmp-dir
-          mountPath: /tmp
-        terminationMessagePolicy: FallbackToLogsOnError
-        securityContext: {}
-      - name: backend
-        image: mcr.microsoft.com/oss/cilium/hubble-ui-backend:v0.12.2
-        imagePullPolicy: Always
-        env:
-        - name: EVENTS_SERVER_PORT
-          value: "8090"
-        - name: FLOWS_API_ADDR
-          value: "hubble-relay:443"
-        - name: TLS_TO_RELAY_ENABLED
-          value: "true"
-        - name: TLS_RELAY_SERVER_NAME
-          value: ui.hubble-relay.cilium.io
-        - name: TLS_RELAY_CA_CERT_FILES
-          value: /var/lib/hubble-ui/certs/hubble-relay-ca.crt
-        - name: TLS_RELAY_CLIENT_CERT_FILE
-          value: /var/lib/hubble-ui/certs/client.crt
-        - name: TLS_RELAY_CLIENT_KEY_FILE
-          value: /var/lib/hubble-ui/certs/client.key
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8090
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: 8090
-        ports:
-        - name: grpc
-          containerPort: 8090
-        resources: {}
-        volumeMounts:
-        - name: hubble-ui-client-certs
-          mountPath: /var/lib/hubble-ui/certs
-          readOnly: true
-        terminationMessagePolicy: FallbackToLogsOnError
-        securityContext: {}
-      nodeSelector:
-        kubernetes.io/os: linux 
-      volumes:
-      - configMap:
-          defaultMode: 420
-          name: hubble-ui-nginx
-        name: hubble-ui-nginx-conf
-      - emptyDir: {}
-        name: tmp-dir
-      - name: hubble-ui-client-certs
-        projected:
-          defaultMode: 0400
-          sources:
-          - secret:
-              name: hubble-relay-client-certs
-              items:
-                - key: tls.crt
-                  path: client.crt
-                - key: tls.key
-                  path: client.key
-                - key: ca.crt
-                  path: hubble-relay-ca.crt
----
-kind: Service
-apiVersion: v1
-metadata:
-  name: hubble-ui
-  namespace: kube-system
-  labels:
-    k8s-app: hubble-ui
-    app.kubernetes.io/name: hubble-ui
-    app.kubernetes.io/part-of: retina
-spec:
-  type: ClusterIP
-  selector:
-    k8s-app: hubble-ui
-  ports:
-    - name: http
-      port: 80
-      targetPort: 8081
-```
-
 Apply the hubble-ui.yaml manifest to your cluster, using the following command
 
 ```bash
-kubectl apply -f hubble-ui.yaml
+kubectl apply -f https://raw.githubusercontent.com/JosephYostos/ACNS_Workshop/refs/heads/main/assets/hubble_UI.yaml
 ```
 
 Set up port forwarding for Hubble UI using the kubectl port-forward command.
@@ -423,110 +184,13 @@ kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].me
 Now, let's deploy some network policy to allow only the required ports 
 
 ```bash
-apiVersion: "cilium.io/v2"
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-rabbitmq-traffic
-  namespace: default
-spec:
-  endpointSelector:
-    matchLabels:
-      app: rabbitmq
-  ingress:
-    - fromEndpoints:
-        - matchLabels:
-            app: order-service
-      toPorts:
-        - ports:
-            - port: "5672"
-              protocol: TCP
-            - port: "15672"
-              protocol: TCP
-  egress: []  # Block all egress traffic from rabbitmq
----
-apiVersion: "cilium.io/v2"
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-order-service-traffic
-  namespace: default
-spec:
-  endpointSelector:
-    matchLabels:
-      app: order-service
-  ingress:
-    - fromEndpoints:
-        - matchLabels:
-            app: store-front
-      toPorts:
-        - ports:
-            - port: "3000"
-              protocol: TCP
-  egress:
-    - toEndpoints:
-        - matchLabels:
-            app: rabbitmq
-      toPorts:
-        - ports:
-            - port: "5672"
-              protocol: TCP
----
-apiVersion: "cilium.io/v2"
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-product-service-traffic
-  namespace: default
-spec:
-  endpointSelector:
-    matchLabels:
-      app: product-service
-  ingress:
-    - fromEndpoints:
-        - matchLabels:
-            app: store-front
-      toPorts:
-        - ports:
-            - port: "3002"
-              protocol: TCP
-  egress:
-    - toEndpoints:
-        - matchLabels:
-            app: ai-service
-      toPorts:
-        - ports:
-            - port: "5001"
-              protocol: TCP
----
-apiVersion: "cilium.io/v2"
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-store-front-traffic
-  namespace: default
-spec:
-  endpointSelector:
-    matchLabels:
-      app: store-front
-  ingress:
-    - fromEntities:
-        - world  # Allow external traffic to store-front via LoadBalancer.
-      toPorts:
-        - ports:
-            - port: "8080"
-              protocol: TCP
-  egress:
-    - toEndpoints:
-        - matchLabels:
-            app: order-service
-      toPorts:
-        - ports:
-            - port: "3000"
-              protocol: TCP
-    - toEndpoints:
-        - matchLabels:
-            app: product-service
-      toPorts:
-        - ports:
-            - port: "3002"
-              protocol: TCP
+kubectl apply -f https://raw.githubusercontent.com/JosephYostos/ACNS_Workshop/refs/heads/main/assets/neywork_policy.yaml
+```
+
+review the created policies
+
+```bash
+kubectl get cnp
 ```
 
 No if we access the pet shop app UI we should be able to order any product normally but if we test connection with external world and unwantd internal connections that should be blocked.
@@ -556,82 +220,23 @@ To allow the access to Microsoft Graph API we will create fqdn Network policy
 Note: FQDN filtering requires ACNS to be enabled 
 
 ```bash
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-order-service-traffic
-  namespace: default
-spec:
-  endpointSelector:
-    matchLabels:
-      app: order-service
-  egress:
-  - toEndpoints:
-    - matchLabels:
-        io.kubernetes.pod.namespace: kube-system
-        k8s-app: kube-dns
-    - matchLabels:
-        io.kubernetes.pod.namespace: default
-        app: rabbitmq
-    toPorts:
-    - ports:
-      - port: "53"
-        protocol: UDP
-      rules:
-        dns:
-          - matchPattern: "rabbitmq.default.svc.cluster.local"
-          - matchPattern: "*.microsoft.com"
-          - matchPattern: '*.microsoft.com.cluster.local'
-          - matchPattern: '*.microsoft.com.default.svc.cluster.local'
-          - matchPattern: '*.microsoft.com.*.*.internal.cloudapp.net'
-          - matchPattern: '*.microsoft.com.svc.cluster.local'
-  - toFQDNs:
-    - matchPattern: "*.microsoft.com"
-    toPorts:
-      - ports:
-          - port: "443"
-            protocol: TCP
-
----
-
-apiVersion: "cilium.io/v2"
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-store-front-traffic
-  namespace: default
-spec:
-  endpointSelector:
-    matchLabels:
-      app: store-front
-  ingress:
-  - fromEndpoints: []
-  egress:
-    - toEndpoints:
-        - matchLabels:
-            app: order-service
-      toPorts:
-        - ports:
-            - port: "3000"
-              protocol: TCP
-    - toEndpoints:
-        - matchLabels:
-            app: product-service
-      toPorts:
-        - ports:
-            - port: "3002"
-              protocol: TCP
+kubectl apply -f assets/fqdn_policy.yaml
 ```
 
 Now if we try to acccess Microsoft Graph API from order-service app, that should be allowed.
 ```bash
 kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].metadata.name}')  -- sh -c 'wget https://graph.microsoft.com'
 ```
-## Network observability 
+
+## Network Metrics with Grafana 
+
+let's start with applying the chaos policy to generate some drop traffic 
+
+```bash
+kubectl apply -f assets/chaos_policy.yaml
+```
 
 In the previous section we were able to enable traffic to a specific fqdn but it looks that something wrong happened, customers are not able to access the pet shop anymore 
-
-<add screenshot>
-
 
 Let's use grafana dashboard to see what's wrong
 
@@ -649,11 +254,38 @@ Lets' change the view to the  _Kubernetes / Networking / Drops_, select the _def
 
 ![Alt Text](assets/ACNS-dropps_incoming_traffic.png)
 
-now you can see increase in the dropped incomming traffic and the reason is "policy_denied" so now we now the reason that something was wrong with the network policy.
+Now you can see increase in the dropped incomming traffic and the reason is "policy_denied" so now we now the reason that something was wrong with the network policy. let's dive dipper and see dropped network flows using Hubble
 
-famliarize yourself with the other dashobards for DNS, and pod flows
+[Optional] Famliarize yourself with the other dashobards for DNS, and pod flows
 
-<screenshot of other DNS dashboards>
+| ![DNS Dashboard](assets/ACNS-DNS_Dashboard.png) | ![Pod Flows Dashbiard](assets/ACNS-pod-flows-dashboard.png) |
+|-------------------------------|-------------------------------|
+
+
+## observe network flows woth hubble 
+=====> what is hubble as part of ACNS 
+
+We aready have hubble installed in the cluster. check Hubble pods are running using the kubectl get pods command. 
+
+```bash
+kubectl get pods -o wide -n kube-system -l k8s-app=hubble-relay
+```
+
+Your output should look similar to the following example output:
+
+
+hubble-relay-7ddd887cdb-h6khj     1/1  Running     0       23h 
+
+
+
+
+
+
+
+
+
+
+
 
 
 
