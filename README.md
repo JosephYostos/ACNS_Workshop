@@ -636,19 +636,18 @@ In the previous section we were able to enable traffic to a specific fqdn but it
 Let's use grafana dashboard to see what's wrong
 
 From your browser, navigate to [Azure Portal](https://aka.ms/publicportal), search for _acns-grafana_ resource, then click on the _endpoint_ link
-<add screenshot_az-grafana>
+![Alt Text](assets/ACNS-az_grafana.png)
 
 Part of ACNS we proivide pre-definied networking dashboards. Review the avilable dashboards 
-
-<add screenshot_grafana-dashboards>
+![Alt Text](assets/ACNS-grafana_dashboards.png)
 
 you can start with the _Kubernetes / Networking / Clusters_ dashboard to get an over view of whats is happeing in the cluster 
 
-<add screenshot_network-clusters-dashboard>
+![Alt Text](assets/ACNS-network_clusters_dashboard.png)
 
 Lets' change the view to the  _Kubernetes / Networking / Drops_, select the _default_ namespace, and _store-front_ workload  
 
-<add screenshot_drops>
+![Alt Text](assets/ACNS-dropps_incoming_traffic.png)
 
 now you can see increase in the dropped incomming traffic and the reason is "policy_denied" so now we now the reason that something was wrong with the network policy.
 
