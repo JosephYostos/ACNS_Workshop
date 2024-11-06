@@ -1,5 +1,11 @@
 # ACNS_Workshop
 
+Advanced Container Networking Services (ACNS) is a suite of services built to significantly enhance the operational capabilities of your Azure Kubernetes Service (AKS) clusters. 
+Advanced Container Networking Services contains features split into two pillars:
+
+- Security: For clusters using Azure CNI Powered by Cilium, network policies include fully qualified domain name (FQDN) filtering for tackling the complexities of maintaining configuration.
+- Observability: The inaugural feature of the Advanced Container Networking Services suite bringing the power of Hubble’s control plane to both Cilium and non-Cilium Linux data planes. These features aim to provide visibility into networking and performance.
+
 
 ## Cluster Setup 
 
@@ -151,13 +157,9 @@ kubectl -n kube-system port-forward svc/hubble-ui 12000:80
 ```
 Access Hubble UI by entering http://localhost:12000/ into your web browser.
 
-## Setup demo application
+## Setting Up the Demo Application
 
-Let's start by deploying out Pet shop application in the default namespace
-
-```bash
-kubectl apply -f https://raw.githubusercontent.com/Azure-Samples/aks-store-demo/refs/heads/main/aks-store-quickstart.yaml
-```
+In this section, we’ll deploy a sample application to demonstrate ACNS networking policies in action
 
 The application has the following service 
 
@@ -168,6 +170,21 @@ The application has the following service
 | `product-service` | This service is used to perform CRUD operations on products (Rust) |
 | `rabbitmq` | RabbitMQ for an order queue |
 
+First, deploy the Pet Shop application in the default namespace.
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/Azure-Samples/aks-store-demo/refs/heads/main/aks-store-quickstart.yaml
+```
+
+Part of this deployment is a loadblalncer service to access the application ui, use the following command to get the UI IP address,
+
+```bash
+kubectl get svc store-front
+```
+
+Copy the EXTERNAL-IP of the `store-front` service to your browser to access the application
+
+![Alt Text](assets/ACNS-Pets_App.png)
 
 ## Enforce Network Policy 
 
