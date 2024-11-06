@@ -170,21 +170,21 @@ The application has the following service
 | `product-service` | This service is used to perform CRUD operations on products (Rust) |
 | `rabbitmq` | RabbitMQ for an order queue |
 
-1. Deploy the Pet Shop Application
-Begin by deploying the Pet Shop application in the default namespace. 
+1. **Deploy the Pet Shop Application**  
+   Begin by deploying the Pet Shop application in the default namespace. 
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/Azure-Samples/aks-store-demo/refs/heads/main/aks-store-quickstart.yaml
 ```
 
-2. Verify Deployment
+2. **Verify Deployment**
 Ensure all application components are up and running. This confirms the environment is ready for policy testing.
 
 ```bash
 kubectl get pods
 ```
 
-3. Access the application UI
+3. **Access the application UI**
 This application uses a loadblalncer service to allow access to the application UI. Run the following command to get the storefront service IP address.
 
 ```bash
@@ -194,6 +194,7 @@ kubectl get svc store-front
 Copy the EXTERNAL-IP of the `store-front` service to your browser to access the application.
 
 ![Alt Text](assets/ACNS-Pets_App.png)
+
 
 ## Enforce Network Policy 
 
