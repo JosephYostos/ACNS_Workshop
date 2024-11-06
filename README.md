@@ -363,4 +363,4 @@ kubectl -n kube-system port-forward svc/hubble-ui 12000:80
 3. **Aceess Hubble UI**
 Access Hubble UI by entering http://localhost:12000/ into your web browser.
 
-
+![Alt Text](assets/ACNS-Hubble_UI.png)
