@@ -196,9 +196,12 @@ Copy the EXTERNAL-IP of the `store-front` service to your browser to access the 
 ![Alt Text](assets/ACNS-Pets_App.png)
 
 
-## Enforce Network Policy 
+## Enforcing Network Policy 
 
-by default all traffic is allowed in kubernetes, let's do so testing
+In this section, we’ll apply network policies to control traffic flow to and from the Pet Shop application. We will start with standard network policy that doesn't require ACNS, then we enforce more advanced fqdn policie.  
+
+1. **Test Connectivity**
+By default all traffic is allowed in kubernetes. Do the following test to make sure that all traffic is allowed by default
 
 ```bash
 # testing connection with external world
@@ -208,20 +211,22 @@ kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].me
 kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].metadata.name}')  -- sh -c 'nc -zv -w2 product-service.default 3002'
 ```
 
-Now, let's deploy some network policy to allow only the required ports 
+2. **Deploy Netwpork Policy**
+Now, let's deploy some network policy to allow only the required ports in the default namespace.
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/JosephYostos/ACNS_Workshop/refs/heads/main/assets/neywork_policy.yaml
 ```
 
-review the created policies
+3. **Verify Policies**
+Review the created policies using the following command
 
 ```bash
 kubectl get cnp
-```
+``` 
 
-No if we access the pet shop app UI we should be able to order any product normally but if we test connection with external world and unwantd internal connections that should be blocked.
-let's run our test again 
+Ensure that only allowed connections succeed and others are blocked. 
+For example, order-service should not be able to access www.bing.com or the product-service.
 
 ```bash
 # testing connection with external world
@@ -231,26 +236,33 @@ kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].me
 kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].metadata.name}')  -- sh -c 'nc -zv -w2 product-service.default 3002'
 ```
 
-## FQDN policy 
+At the same time, we should be able to access the pet shop app UI and order product norrmally. 
 
-Now the application Owner contacted you asking why his pets shop application is not able to contact Microsoft Graph API.
 
-let's try 
+##  Configuring FQDN (Fully Qualified Domain Name) filtering
+
+In this section, we’ll apply FQDN-based network policies to control outbound access to specific domains. This ACNS feature is only enabled for clusters using Azure CNI Powered by Cilium.
+
+**Goal:** The application Owner is asking to allow the order-service to contact Microsoft Graph API.
+
+1. **Test Connectivity**
+Let's start with testing the connection from the `order service` to Microsoft Graph
 
 ```bash
 kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].metadata.name}')  -- sh -c 'wget https://graph.microsoft.com'
 ```
+As you can see the traffic is denied. This is an expected behaviour because we have implemented zero trust security policy and denying any unwanted traffic.
 
-This is an expected behaviour because we have implemented zero trust security policy and denying any traffic and just enabling the required ones.
-
-To allow the access to Microsoft Graph API we will create fqdn Network policy 
+2. **Create an FQDN Policy**  
+To limit egress to certain domains, apply an FQDN policy. This policy permits access only to specified URLs, ensuring controlled outbound traffic.
 Note: FQDN filtering requires ACNS to be enabled 
 
 ```bash
 kubectl apply -f assets/fqdn_policy.yaml
 ```
-
+3. **Verify FQDN Policy Enforcement**
 Now if we try to acccess Microsoft Graph API from order-service app, that should be allowed.
+
 ```bash
 kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].metadata.name}')  -- sh -c 'wget https://graph.microsoft.com'
 ```
