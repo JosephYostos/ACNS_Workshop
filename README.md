@@ -556,5 +556,105 @@ To allow the access to Microsoft Graph API we will create fqdn Network policy
 Note: FQDN filtering requires ACNS to be enabled 
 
 ```bash
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-order-service-traffic
+  namespace: default
+spec:
+  endpointSelector:
+    matchLabels:
+      app: order-service
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    - matchLabels:
+        io.kubernetes.pod.namespace: default
+        app: rabbitmq
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+      rules:
+        dns:
+          - matchPattern: "rabbitmq.default.svc.cluster.local"
+          - matchPattern: "*.microsoft.com"
+          - matchPattern: '*.microsoft.com.cluster.local'
+          - matchPattern: '*.microsoft.com.default.svc.cluster.local'
+          - matchPattern: '*.microsoft.com.*.*.internal.cloudapp.net'
+          - matchPattern: '*.microsoft.com.svc.cluster.local'
+  - toFQDNs:
+    - matchPattern: "*.microsoft.com"
+    toPorts:
+      - ports:
+          - port: "443"
+            protocol: TCP
+
+---
+
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-store-front-traffic
+  namespace: default
+spec:
+  endpointSelector:
+    matchLabels:
+      app: store-front
+  ingress:
+  - fromEndpoints: []
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app: order-service
+      toPorts:
+        - ports:
+            - port: "3000"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            app: product-service
+      toPorts:
+        - ports:
+            - port: "3002"
+              protocol: TCP
 ```
+
+Now if we try to acccess Microsoft Graph API from order-service app, that should be allowed.
+```bash
+kubectl exec -it $(kubectl get po -l app=order-service -ojsonpath='{.items[0].metadata.name}')  -- sh -c 'wget https://graph.microsoft.com'
+```
+## Network observability 
+
+In the previous section we were able to enable traffic to a specific fqdn but it looks that something wrong happened, customers are not able to access the pet shop anymore 
+
+<add screenshot>
+
+
+Let's use grafana dashboard to see what's wrong
+
+From your browser, navigate to [Azure Portal](https://aka.ms/publicportal), search for _acns-grafana_ resource, then click on the _endpoint_ link
+<add screenshot_az-grafana>
+
+Part of ACNS we proivide pre-definied networking dashboards. Review the avilable dashboards 
+
+<add screenshot_grafana-dashboards>
+
+you can start with the _Kubernetes / Networking / Clusters_ dashboard to get an over view of whats is happeing in the cluster 
+
+<add screenshot_network-clusters-dashboard>
+
+Lets' change the view to the  _Kubernetes / Networking / Drops_, select the _default_ namespace, and _store-front_ workload  
+
+<add screenshot_drops>
+
+now you can see increase in the dropped incomming traffic and the reason is "policy_denied" so now we now the reason that something was wrong with the network policy.
+
+famliarize yourself with the other dashobards for DNS, and pod flows
+
+<screenshot of other DNS dashboards>
+
+
 
